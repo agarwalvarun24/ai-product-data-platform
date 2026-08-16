@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+import Sidebar from "@/components/layout/Sidebar";
+import Topbar from "@/components/layout/Topbar";
+
 export const metadata: Metadata = {
   title: {
     default: "ProductIQ",
@@ -17,7 +20,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <Sidebar />
+        <Topbar />
+
+        <div className="min-h-screen pl-[250px] pt-[72px]">
+          <main className="mx-auto max-w-[1600px] px-8 py-8">
+            {children}
+          </main>
+        </div>
+      </body>
     </html>
   );
 }
