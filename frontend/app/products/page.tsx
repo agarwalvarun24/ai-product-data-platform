@@ -2,412 +2,513 @@
 
 import {
   useEffect,
+  useMemo,
   useState,
 } from "react";
 
 import {
-  ArrowUpRight,
-  CheckCircle2,
-  CircleAlert,
-  Package,
-  Search,
-  SlidersHorizontal,
-} from "lucide-react";
-
-import PageHeader from "@/components/layout/PageHeader";
-import {
   getProducts,
-  type Product,
+  Product,
 } from "@/lib/api";
 
+const PAGE_SIZE = 50;
+
+function getTitle(product: Product) {
+  return (
+    product.title ||
+    product.raw_title ||
+    "Untitled product"
+  );
+}
+
+function getSku(product: Product) {
+  return (
+    product.sku ||
+    product.product_id ||
+    String(product.id)
+  );
+}
+
+function getConfidence(product: Product) {
+  if (
+    typeof product.confidence_score === "number"
+  ) {
+    return product.confidence_score;
+  }
+
+  if (
+    typeof product.quality_score === "number"
+  ) {
+    return product.quality_score / 100;
+  }
+
+  return null;
+}
+
+function getStatus(product: Product) {
+  if (product.status) {
+    return product.status;
+  }
+
+  if (product.valid === true) {
+    return "validated";
+  }
+
+  return "pending";
+}
+
+function formatStatus(status: string) {
+  return status
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (char) =>
+      char.toUpperCase(),
+    );
+}
 
 export default function ProductsPage() {
-  const [
-    products,
-    setProducts,
-  ] = useState<Product[]>([]);
+  const [products, setProducts] =
+    useState<Product[]>([]);
 
-  const [
-    loading,
-    setLoading,
-  ] = useState(true);
+  const [total, setTotal] = useState(0);
 
-  const [
-    error,
-    setError,
-  ] = useState("");
+  const [page, setPage] = useState(1);
 
+  const [searchInput, setSearchInput] =
+    useState("");
+
+  const [search, setSearch] = useState("");
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState("");
+
+  async function loadProducts() {
+    try {
+      setLoading(true);
+      setError("");
+
+      const result = await getProducts(
+        page,
+        PAGE_SIZE,
+        search,
+      );
+
+      setProducts(result.products);
+      setTotal(result.total);
+    } catch (error) {
+      console.error(error);
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Unable to load products.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function load() {
-      try {
-        setLoading(true);
+    loadProducts();
+  }, [page, search]);
 
-        const result =
-          await getProducts({
-            page: 1,
-            page_size: 50,
-          });
+  const totalPages = Math.max(
+    1,
+    Math.ceil(total / PAGE_SIZE),
+  );
 
-        setProducts(
-          result.products,
+  const enrichedCount = useMemo(
+    () =>
+      products.filter(
+        (product) =>
+          typeof product.confidence_score ===
+          "number",
+      ).length,
+    [products],
+  );
+
+  const reviewCount = useMemo(
+    () =>
+      products.filter((product) => {
+        const confidence =
+          getConfidence(product);
+
+        return (
+          confidence !== null &&
+          confidence < 0.7
         );
+      }).length,
+    [products],
+  );
 
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to load products.",
-        );
+  function searchProducts() {
+    setPage(1);
+    setSearch(searchInput);
+  }
 
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    load();
-  }, []);
-
+  function clearSearch() {
+    setSearchInput("");
+    setSearch("");
+    setPage(1);
+  }
 
   return (
-    <main>
-      <PageHeader
-        eyebrow="Product intelligence"
-        title="Products"
-        description="Explore standardized product records, AI enrichment results, and data quality."
-      />
+    <main className="min-h-screen bg-[#f8f9fc] px-8 py-10">
+      <div className="mx-auto max-w-[1400px]">
 
+        <div className="mb-8">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
+            Product Intelligence
+          </p>
 
-      <div className="mb-5 grid grid-cols-4 gap-4">
+          <h1 className="text-4xl font-semibold tracking-tight text-slate-950">
+            Products
+          </h1>
 
-        <SummaryCard
-          label="Products"
-          value={products.length}
-          icon={
-            <Package size={17} />
-          }
-        />
+          <p className="mt-2 text-sm text-slate-500">
+            Explore standardized product records,
+            AI enrichment results, and data quality.
+          </p>
+        </div>
 
-        <SummaryCard
-          label="High quality"
-          value={
-            products.filter(
-              (p) =>
-                (p.quality_score ?? 0) >=
-                90,
-            ).length
-          }
-          icon={
-            <CheckCircle2 size={17} />
-          }
-        />
+        <div className="mb-6 grid gap-4 md:grid-cols-4">
 
-        <SummaryCard
-          label="Needs review"
-          value={
-            products.filter(
-              (p) =>
-                p.review_status ===
-                "review",
-            ).length
-          }
-          icon={
-            <CircleAlert size={17} />
-          }
-        />
+          <MetricCard
+            value={total}
+            label="Products"
+          />
 
-        <SummaryCard
-          label="AI enriched"
-          value={
-            products.filter(
-              (p) =>
-                p.enrichment_status ===
-                "completed",
-            ).length
-          }
-          icon={
-            <ArrowUpRight size={17} />
-          }
-        />
+          <MetricCard
+            value={enrichedCount}
+            label="AI enriched"
+          />
 
-      </div>
+          <MetricCard
+            value={reviewCount}
+            label="Needs review"
+          />
 
-
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-
-        <div className="flex items-center justify-between border-b border-gray-100 p-4">
-
-          <div className="flex h-10 w-[320px] items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3">
-
-            <Search
-              size={15}
-              className="text-gray-400"
-            />
-
-            <input
-              placeholder="Search products..."
-              className="w-full bg-transparent text-xs outline-none"
-            />
-
-          </div>
-
-
-          <button className="flex h-10 items-center gap-2 rounded-xl border border-gray-200 px-3.5 text-xs font-medium text-gray-600">
-
-            <SlidersHorizontal
-              size={14}
-            />
-
-            Filters
-
-          </button>
+          <MetricCard
+            value={
+              products.length
+                ? `${Math.round(
+                    (enrichedCount /
+                      products.length) *
+                      100,
+                  )}%`
+                : "0%"
+            }
+            label="Enrichment coverage"
+          />
 
         </div>
 
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
 
-        {loading && (
-          <div className="p-12 text-center text-sm text-gray-400">
-            Loading products...
-          </div>
-        )}
+          <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
 
+            <div className="flex flex-1 gap-3">
 
-        {error && !loading && (
-          <div className="p-12 text-center">
-
-            <div className="text-sm font-semibold text-red-600">
-              Unable to load products
-            </div>
-
-            <div className="mt-2 text-xs text-gray-400">
-              {error}
-            </div>
-
-          </div>
-        )}
-
-
-        {!loading &&
-          !error &&
-          products.length === 0 && (
-            <div className="p-12 text-center">
-
-              <Package
-                size={30}
-                className="mx-auto text-gray-300"
+              <input
+                value={searchInput}
+                onChange={(event) =>
+                  setSearchInput(
+                    event.target.value,
+                  )
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    searchProducts();
+                  }
+                }}
+                placeholder="Search products..."
+                className="h-11 w-full max-w-md rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100"
               />
 
-              <div className="mt-4 text-sm font-semibold text-gray-700">
-                No products yet
-              </div>
+              <button
+                onClick={searchProducts}
+                className="rounded-xl bg-slate-950 px-5 text-sm font-medium text-white hover:bg-slate-800"
+              >
+                Search
+              </button>
 
-              <div className="mt-1 text-xs text-gray-400">
-                Upload a CSV or Excel
-                dataset to begin.
-              </div>
-
-            </div>
-          )}
-
-
-        {!loading &&
-          !error &&
-          products.length > 0 && (
-
-            <div className="overflow-x-auto">
-
-              <table className="w-full">
-
-                <thead>
-
-                  <tr className="border-b border-gray-100 bg-gray-50">
-
-                    <Header>
-                      Product
-                    </Header>
-
-                    <Header>
-                      Manufacturer
-                    </Header>
-
-                    <Header>
-                      Category
-                    </Header>
-
-                    <Header>
-                      Quality
-                    </Header>
-
-                    <Header>
-                      AI confidence
-                    </Header>
-
-                    <Header>
-                      Status
-                    </Header>
-
-                  </tr>
-
-                </thead>
-
-
-                <tbody>
-
-                  {products.map(
-                    (product) => (
-                      <tr
-                        key={product.id}
-                        className="border-b border-gray-100 hover:bg-gray-50"
-                      >
-
-                        <td className="px-5 py-4">
-
-                          <div className="text-sm font-medium text-gray-900">
-                            {product.title ||
-                              product.raw_title ||
-                              "Untitled"}
-                          </div>
-
-                          <div className="mt-1 text-[10px] text-gray-400">
-                            {product.sku ||
-                              product.id}
-                          </div>
-
-                        </td>
-
-
-                        <td className="px-5 py-4 text-xs text-gray-600">
-                          {product.manufacturer ||
-                            "—"}
-                        </td>
-
-
-                        <td className="px-5 py-4 text-xs text-gray-500">
-                          {product.category ||
-                            "—"}
-                        </td>
-
-
-                        <td className="px-5 py-4">
-
-                          <Quality
-                            value={
-                              product.quality_score ??
-                              0
-                            }
-                          />
-
-                        </td>
-
-
-                        <td className="px-5 py-4 text-xs font-semibold">
-
-                          {product.confidence_score !=
-                          null
-                            ? `${product.confidence_score}%`
-                            : "—"}
-
-                        </td>
-
-
-                        <td className="px-5 py-4">
-
-                          <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-semibold text-gray-600">
-                            {product.enrichment_status ||
-                              "pending"}
-                          </span>
-
-                        </td>
-
-                      </tr>
-                    ),
-                  )}
-
-                </tbody>
-
-              </table>
+              {search && (
+                <button
+                  onClick={clearSearch}
+                  className="rounded-xl border border-slate-200 px-4 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  Clear
+                </button>
+              )}
 
             </div>
 
+            <button className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              Filters
+            </button>
+
+          </div>
+
+          {error && (
+            <div className="m-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
           )}
+
+          {loading && (
+            <div className="p-12 text-center text-sm text-slate-500">
+              Loading products...
+            </div>
+          )}
+
+          {!loading &&
+            !error &&
+            products.length === 0 && (
+              <div className="p-16 text-center">
+                <p className="font-medium text-slate-900">
+                  No products found
+                </p>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Import a dataset or change your
+                  search.
+                </p>
+              </div>
+            )}
+
+          {!loading &&
+            products.length > 0 && (
+              <div className="overflow-x-auto">
+
+                <table className="w-full min-w-[950px]">
+
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50">
+
+                      <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Product
+                      </th>
+
+                      <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Manufacturer
+                      </th>
+
+                      <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Category
+                      </th>
+
+                      <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Quality
+                      </th>
+
+                      <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        AI Confidence
+                      </th>
+
+                      <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Status
+                      </th>
+
+                    </tr>
+                  </thead>
+
+                  <tbody>
+
+                    {products.map((product) => {
+                      const confidence =
+                        getConfidence(product);
+
+                      const status =
+                        getStatus(product);
+
+                      return (
+                        <tr
+                          key={String(
+                            product.id,
+                          )}
+                          className="border-b border-slate-100 hover:bg-slate-50"
+                        >
+
+                          <td className="px-5 py-5">
+
+                            <p className="max-w-[320px] truncate text-sm font-semibold text-slate-900">
+                              {getTitle(product)}
+                            </p>
+
+                            <p className="mt-1 text-xs text-slate-400">
+                              {getSku(product)}
+                            </p>
+
+                          </td>
+
+                          <td className="px-5 py-5 text-sm text-slate-600">
+                            {product.manufacturer ||
+                              "—"}
+                          </td>
+
+                          <td className="px-5 py-5 text-sm text-slate-600">
+                            {product.category ||
+                              "—"}
+                          </td>
+
+                          <td className="px-5 py-5">
+
+                            <div className="flex items-center gap-3">
+
+                              <div className="h-2 w-20 overflow-hidden rounded-full bg-slate-100">
+
+                                <div
+                                  className="h-full rounded-full bg-indigo-500"
+                                  style={{
+                                    width: `${Math.min(
+                                      100,
+                                      Math.max(
+                                        0,
+                                        product.quality_score ??
+                                          0,
+                                      ),
+                                    )}%`,
+                                  }}
+                                />
+
+                              </div>
+
+                              <span className="text-xs text-slate-600">
+                                {product.quality_score ??
+                                  0}
+                              </span>
+
+                            </div>
+
+                          </td>
+
+                          <td className="px-5 py-5">
+
+                            {confidence === null ? (
+                              <span className="text-sm text-slate-400">
+                                —
+                              </span>
+                            ) : (
+                              <span className="text-sm font-semibold text-slate-700">
+                                {Math.round(
+                                  confidence *
+                                    100,
+                                )}
+                                %
+                              </span>
+                            )}
+
+                          </td>
+
+                          <td className="px-5 py-5">
+
+                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                              {formatStatus(
+                                status,
+                              )}
+                            </span>
+
+                          </td>
+
+                        </tr>
+                      );
+                    })}
+
+                  </tbody>
+
+                </table>
+
+              </div>
+            )}
+
+          {!loading &&
+            products.length > 0 && (
+              <div className="flex items-center justify-between border-t border-slate-200 px-5 py-4">
+
+                <p className="text-sm text-slate-500">
+                  Showing{" "}
+                  {(page - 1) *
+                    PAGE_SIZE +
+                    1}
+                  –
+                  {Math.min(
+                    page * PAGE_SIZE,
+                    total,
+                  )}{" "}
+                  of {total} products
+                </p>
+
+                <div className="flex items-center gap-2">
+
+                  <button
+                    disabled={page === 1}
+                    onClick={() =>
+                      setPage(
+                        (current) =>
+                          Math.max(
+                            1,
+                            current - 1,
+                          ),
+                      )
+                    }
+                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+
+                  <span className="px-3 text-sm text-slate-600">
+                    Page {page} of{" "}
+                    {totalPages}
+                  </span>
+
+                  <button
+                    disabled={
+                      page === totalPages
+                    }
+                    onClick={() =>
+                      setPage(
+                        (current) =>
+                          Math.min(
+                            totalPages,
+                            current + 1,
+                          ),
+                      )
+                    }
+                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+
+                </div>
+
+              </div>
+            )}
+
+        </section>
 
       </div>
-
     </main>
   );
 }
 
-
-function Header({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-      {children}
-    </th>
-  );
-}
-
-
-function SummaryCard({
+function MetricCard({
+  value,
   label,
-  value,
-  icon,
 }: {
+  value: number | string;
   label: string;
-  value: number;
-  icon: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5">
-
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-50 text-gray-500">
-        {icon}
-      </div>
-
-      <div className="mt-5 text-2xl font-semibold text-gray-950">
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <p className="text-3xl font-semibold tracking-tight text-slate-950">
         {value}
-      </div>
+      </p>
 
-      <div className="mt-1 text-xs text-gray-400">
+      <p className="mt-2 text-sm text-slate-500">
         {label}
-      </div>
-
-    </div>
-  );
-}
-
-
-function Quality({
-  value,
-}: {
-  value: number;
-}) {
-  return (
-    <div className="flex items-center gap-3">
-
-      <div className="h-1.5 w-20 overflow-hidden rounded-full bg-gray-100">
-
-        <div
-          className="h-full rounded-full bg-indigo-500"
-          style={{
-            width: `${Math.min(
-              Math.max(value, 0),
-              100,
-            )}%`,
-          }}
-        />
-
-      </div>
-
-      <span className="text-xs font-semibold text-gray-700">
-        {value
-          ? value
-          : "—"}
-      </span>
-
+      </p>
     </div>
   );
 }

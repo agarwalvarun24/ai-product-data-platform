@@ -2,167 +2,104 @@ const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:8000";
 
-async function request<T>(
-  endpoint: string,
-  options: RequestInit = {},
-): Promise<T> {
+export interface Product {
+  id: string | number;
+  sku?: string;
+  product_id?: string;
+
+  title?: string;
+  raw_title?: string;
+
+  manufacturer?: string;
+
+  category?: string;
+
+  description?: string;
+  raw_description?: string;
+
+  quality_score?: number | null;
+
+  confidence_score?: number | null;
+
+  status?: string;
+
+  valid?: boolean;
+
+  validation_errors?: string[];
+}
+
+export interface ProductsResponse {
+  products: Product[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages?: number;
+}
+
+export async function getProducts(
+  page = 1,
+  pageSize = 50,
+  search = "",
+): Promise<ProductsResponse> {
+  const params = new URLSearchParams();
+
+  params.set("page", String(page));
+  params.set("page_size", String(pageSize));
+
+  if (search.trim()) {
+    params.set("search", search.trim());
+  }
+
   const response = await fetch(
-    `${API_URL}${endpoint}`,
+    `${API_URL}/api/products?${params.toString()}`,
     {
-      ...options,
-      headers: {
-        ...(options.body instanceof FormData
-          ? {}
-          : {
-              "Content-Type":
-                "application/json",
-            }),
-        ...(options.headers || {}),
-      },
       cache: "no-store",
     },
   );
 
   if (!response.ok) {
-    let message =
-      `Request failed: ${response.status}`;
-
-    try {
-      const error = await response.json();
-
-      if (error.detail) {
-        message =
-          typeof error.detail === "string"
-            ? error.detail
-            : JSON.stringify(error.detail);
-      }
-    } catch {}
-
-    throw new Error(message);
-  }
-
-  return response.json();
-}
-
-
-export interface Product {
-  id: string;
-
-  sku?: string | null;
-  manufacturer?: string | null;
-
-  raw_title?: string | null;
-  raw_description?: string | null;
-
-  title?: string | null;
-  description?: string | null;
-
-  category?: string | null;
-
-  attributes?: Record<
-    string,
-    unknown
-  >;
-
-  quality_score?: number | null;
-  confidence_score?: number | null;
-
-  enrichment_status?: string | null;
-  review_status?: string | null;
-
-  source?: string | null;
-
-  created_at?: string;
-  updated_at?: string;
-}
-
-
-export interface ProductListResponse {
-  products: Product[];
-  total: number;
-  page: number;
-  page_size: number;
-}
-
-
-export async function getProducts(
-  params?: {
-    page?: number;
-    page_size?: number;
-    search?: string;
-  },
-): Promise<ProductListResponse> {
-  const searchParams =
-    new URLSearchParams();
-
-  if (params?.page) {
-    searchParams.set(
-      "page",
-      String(params.page),
+    throw new Error(
+      `Failed to load products (${response.status})`,
     );
   }
 
-  if (params?.page_size) {
-    searchParams.set(
-      "page_size",
-      String(params.page_size),
-    );
+  const data = await response.json();
+
+  if (Array.isArray(data)) {
+    return {
+      products: data,
+      total: data.length,
+      page,
+      page_size: pageSize,
+      total_pages: Math.ceil(
+        data.length / pageSize,
+      ),
+    };
   }
 
-  if (params?.search) {
-    searchParams.set(
-      "search",
-      params.search,
-    );
-  }
+  return {
+    products: Array.isArray(data.products)
+      ? data.products
+      : [],
 
-  const query =
-    searchParams.toString();
+    total:
+      typeof data.total === "number"
+        ? data.total
+        : 0,
 
-  return request<ProductListResponse>(
-    `/api/products${
-      query ? `?${query}` : ""
-    }`,
-  );
-}
+    page:
+      typeof data.page === "number"
+        ? data.page
+        : page,
 
+    page_size:
+      typeof data.page_size === "number"
+        ? data.page_size
+        : pageSize,
 
-export async function getProduct(
-  id: string,
-): Promise<Product> {
-  return request<Product>(
-    `/api/products/${id}`,
-  );
-}
-
-
-export async function uploadDataset(
-  file: File,
-) {
-  const formData = new FormData();
-
-  formData.append(
-    "file",
-    file,
-  );
-
-  return request(
-    "/api/ingestion/upload",
-    {
-      method: "POST",
-      body: formData,
-    },
-  );
-}
-
-
-export async function enrichProduct(
-  id: string,
-) {
-  return request(
-    `/api/enrichment/${id}`,
-    {
-      method: "POST",
-    },
-  );
+    total_pages:
+      typeof data.total_pages === "number"
+        ? data.total_pages
+        : undefined,
+  };
 }
