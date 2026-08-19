@@ -6,25 +6,16 @@ export interface Product {
   id: string | number;
   sku?: string;
   product_id?: string;
-
   title?: string;
   raw_title?: string;
-
   manufacturer?: string;
-
   category?: string;
-
   description?: string;
   raw_description?: string;
-
   quality_score?: number | null;
-
   confidence_score?: number | null;
-
   status?: string;
-
   valid?: boolean;
-
   validation_errors?: string[];
 }
 
@@ -81,22 +72,18 @@ export async function getProducts(
     products: Array.isArray(data.products)
       ? data.products
       : [],
-
     total:
       typeof data.total === "number"
         ? data.total
         : 0,
-
     page:
       typeof data.page === "number"
         ? data.page
         : page,
-
     page_size:
       typeof data.page_size === "number"
         ? data.page_size
         : pageSize,
-
     total_pages:
       typeof data.total_pages === "number"
         ? data.total_pages
