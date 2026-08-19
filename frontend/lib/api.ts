@@ -90,3 +90,29 @@ export async function getProducts(
         : undefined,
   };
 }
+export async function uploadDataset(
+  file: File,
+) {
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+  const response = await fetch(
+    `${API_URL}/api/ingestion/upload`,
+    {
+      method: "POST",
+      body: formData,
+    },
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data?.detail ||
+        `Upload failed (${response.status})`,
+    );
+  }
+
+  return data;
+}
