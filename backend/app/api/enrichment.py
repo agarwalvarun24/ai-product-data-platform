@@ -4,8 +4,10 @@ from sqlalchemy.orm import Session
 from app.ai.enrichment import enrich_product
 from app.database.connection import get_db
 from app.models.product import Product
-from app.schemas.enrichment import EnrichmentResponse
-
+from app.schemas.enrichment import (
+    EnrichmentResponse,
+    BulkEnrichmentRequest,
+)
 
 router = APIRouter(
     prefix="/api/enrichment",
@@ -89,3 +91,67 @@ def enrich_single_product(
             status_code=500,
             detail=str(exc),
         ) from exc
+
+@router.post("/bulk")
+def enrich_multiple_products(
+    request: BulkEnrichmentRequest,
+    db: Session = Depends(get_db),
+):
+    successful = 0
+    failed = 0
+
+    for product_id in request.product_ids:
+        product = (
+            db.query(Product)
+            .filter(Product.id == product_id)
+            .first()
+        )
+
+        if not product:
+            failed += 1
+            continue
+
+        source = {
+            "sku": product.sku,
+            "manufacturer": product.manufacturer,
+            "raw_title": product.raw_title,
+            "raw_description": product.raw_description,
+            "category": product.category,
+            "attributes": product.attributes,
+        }
+
+        try:
+            result = enrich_product(source)
+
+            product.title = result["title"]
+            product.description = result["description"]
+            product.category = result["category"]
+            product.attributes = result["attributes"]
+            product.confidence_score = result[
+                "confidence_score"
+            ]
+
+            product.enrichment_status = "completed"
+
+            if result["confidence_score"] >= 90:
+                product.review_status = "not_required"
+            else:
+                product.review_status = "review"
+
+            successful += 1
+
+        except Exception:
+            product.enrichment_status = "failed"
+            failed += 1
+
+    db.commit()
+
+    return {
+        "success": failed == 0,
+        "processed": len(request.product_ids),
+        "successful": successful,
+        "failed": failed,
+        "message": (
+            f"Processed {len(request.product_ids)} products."
+        ),
+    }

@@ -13,3 +13,6 @@ class EnrichmentResponse(BaseModel):
     confidence_score: float = 0
     validation_errors: list[str] = []
     message: str
+
+class BulkEnrichmentRequest(BaseModel):
+    product_ids: list[str]
