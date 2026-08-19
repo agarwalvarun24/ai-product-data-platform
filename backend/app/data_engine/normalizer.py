@@ -2,21 +2,45 @@ import re
 
 
 COLUMN_ALIASES = {
-    "part number": "sku",
+    # SKU / part number
+    "sku": "sku",
     "part_number": "sku",
-    "part no": "sku",
     "part_no": "sku",
-    "product code": "sku",
+    "partnumber": "sku",
+    "part_num": "sku",
+    "item_number": "sku",
+    "item_no": "sku",
     "product_code": "sku",
-    "manufacturer name": "manufacturer",
+    "productcode": "sku",
+    "mfg_part_num": "sku",
+    "manufacturer_part_number": "sku",
+
+    # Manufacturer
+    "manufacturer": "manufacturer",
+    "manufacturer_name": "manufacturer",
+    "part_manuf": "manufacturer",
+    "part_manufacturer": "manufacturer",
+    "mfg": "manufacturer",
+    "mfr": "manufacturer",
     "brand": "manufacturer",
-    "product name": "raw_title",
-    "name": "raw_title",
+
+    # Product title
     "title": "raw_title",
-    "product title": "raw_title",
+    "product_title": "raw_title",
+    "product_name": "raw_title",
+    "name": "raw_title",
+    "part_desc": "raw_title",
+    "part_description": "raw_title",
+
+    # Description
     "description": "raw_description",
-    "product description": "raw_description",
-    "category name": "category",
+    "product_description": "raw_description",
+    "raw_description": "raw_description",
+
+    # Category
+    "category": "category",
+    "category_name": "category",
+    "product_category": "category",
 }
 
 
@@ -35,14 +59,10 @@ ABBREVIATIONS = {
 
 def normalize_column_name(name: str) -> str:
     name = str(name).strip().lower()
-
     name = re.sub(r"[^a-z0-9]+", "_", name)
     name = name.strip("_")
 
-    return COLUMN_ALIASES.get(
-        name,
-        name,
-    )
+    return COLUMN_ALIASES.get(name, name)
 
 
 def normalize_product_row(row: dict) -> dict:

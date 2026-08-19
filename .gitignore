@@ -8,4 +8,13 @@ node_modules/
 .next/
 out/
 
-.DS_Store
+.DS_Store.env
+**/.env
+**/.env.*
+.env
+**/.env
+**/.env.*
+
+# Local environment files
+backend/.env
+frontend/.env.local

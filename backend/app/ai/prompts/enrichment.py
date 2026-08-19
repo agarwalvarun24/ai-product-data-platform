@@ -1,7 +1,7 @@
 ENRICHMENT_PROMPT = """
-Enrich the following industrial product.
+Enrich the following industrial product using only the information provided.
 
-SOURCE PRODUCT:
+PRODUCT INFORMATION
 
 SKU:
 {sku}
@@ -21,15 +21,23 @@ Existing category:
 Existing attributes:
 {attributes}
 
-Return JSON with:
+Return ONLY valid JSON in exactly this structure:
 
-{
-  "title": "...",
-  "description": "...",
-  "category": "...",
-  "attributes": {},
-  "reasoning": "..."
-}
+{{
+    "title": "A clear professional product title",
+    "description": "A concise professional product description",
+    "category": "A normalized product category",
+    "attributes": {{
+        "key": "value"
+    }},
+    "reasoning": "Short explanation of how the enrichment was determined."
+}}
 
-Only use information supported by the source.
+Rules:
+- Do not invent specifications that are not supported by the input.
+- Preserve known measurements, sizes, materials, ratings, and other technical information.
+- Improve unclear or abbreviated wording.
+- Use an empty string when a field cannot be determined.
+- Keep attributes as a JSON object.
+- Return JSON only.
 """
