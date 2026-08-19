@@ -116,3 +116,24 @@ export async function uploadDataset(
 
   return data;
 }
+export async function enrichProduct(
+  productId: string | number,
+) {
+  const response = await fetch(
+    `${API_URL}/api/enrichment/${productId}`,
+    {
+      method: "POST",
+    },
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data?.detail ||
+        `Enrichment failed (${response.status})`,
+    );
+  }
+
+  return data;
+}
