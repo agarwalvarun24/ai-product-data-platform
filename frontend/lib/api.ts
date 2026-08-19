@@ -6,16 +6,28 @@ export interface Product {
   id: string | number;
   sku?: string;
   product_id?: string;
+
   title?: string;
   raw_title?: string;
+
   manufacturer?: string;
+
   category?: string;
+
   description?: string;
   raw_description?: string;
+
+  attributes?: Record<string, unknown>;
+
   quality_score?: number | null;
   confidence_score?: number | null;
+
+  enrichment_status?: string;
+  review_status?: string;
+
   status?: string;
   valid?: boolean;
+
   validation_errors?: string[];
 }
 
@@ -90,6 +102,7 @@ export async function getProducts(
         : undefined,
   };
 }
+
 export async function uploadDataset(
   file: File,
 ) {
@@ -116,6 +129,7 @@ export async function uploadDataset(
 
   return data;
 }
+
 export async function enrichProduct(
   productId: string | number,
 ) {
@@ -132,6 +146,34 @@ export async function enrichProduct(
     throw new Error(
       data?.detail ||
         `Enrichment failed (${response.status})`,
+    );
+  }
+
+  return data;
+}
+
+export async function enrichProductsBulk(
+  productIds: Array<string | number>,
+) {
+  const response = await fetch(
+    `${API_URL}/api/enrichment/bulk`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        product_ids: productIds.map(String),
+      }),
+    },
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data?.detail ||
+        `Bulk enrichment failed (${response.status})`,
     );
   }
 
