@@ -5,7 +5,7 @@ description = "AI Product Data Enrichment Platform"
 requires-python = ">=3.11"
 
 dependencies = [
-    "fastapi",
+    "fastapi[standard]",
     "uvicorn[standard]",
     "sqlalchemy",
     "pydantic",
