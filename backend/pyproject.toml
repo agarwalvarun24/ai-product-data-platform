@@ -1,2 +1,26 @@
+[project]
+name = "ai-product-data-platform"
+version = "0.1.0"
+description = "AI Product Data Enrichment Platform"
+requires-python = ">=3.11"
+
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "sqlalchemy",
+    "pydantic",
+    "psycopg2-binary",
+    "python-multipart",
+    "pandas",
+    "openpyxl",
+    "requests",
+    "beautifulsoup4",
+    "google-generativeai"
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [tool.fastapi]
 entrypoint = "app.main:app"
