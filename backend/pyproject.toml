@@ -15,7 +15,8 @@ dependencies = [
     "openpyxl",
     "requests",
     "beautifulsoup4",
-    "google-generativeai"
+    "google-generativeai",
+    "google-genai>=2.19.0",
 ]
 
 [build-system]
