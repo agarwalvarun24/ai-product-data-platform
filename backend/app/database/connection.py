@@ -44,5 +44,6 @@ def get_db():
 def init_db():
     from app.models.product import Product
     from app.models.dataset import Dataset
+    from app.models.review import Review
 
     Base.metadata.create_all(bind=engine)

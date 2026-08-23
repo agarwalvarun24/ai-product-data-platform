@@ -5,6 +5,8 @@ from app.api.health import router as health_router
 from app.api.ingestion import router as ingestion_router
 from app.api.products import router as products_router
 from app.api.enrichment import router as enrichment_router
+from app.api.review import router as review_router
+from app.api.analytics import router as analytics_router
 from app.core.config import settings
 from app.database.connection import init_db
 
@@ -40,6 +42,8 @@ app.include_router(health_router)
 app.include_router(ingestion_router)
 app.include_router(products_router)
 app.include_router(enrichment_router)
+app.include_router(review_router)
+app.include_router(analytics_router)
 
 
 @app.get("/")

@@ -179,3 +179,134 @@ export async function enrichProductsBulk(
 
   return data;
 }
+export interface ReviewProduct {
+  id: string;
+  sku?: string;
+  title?: string;
+  raw_title?: string;
+  manufacturer?: string;
+  category?: string;
+  description?: string;
+  confidence_score?: number;
+  enrichment_status?: string;
+  review_status?: string;
+}
+
+export async function getPendingReviews() {
+  const response = await fetch(
+    `${API_URL}/api/review/pending`,
+    {
+      cache: "no-store",
+    },
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data?.detail ||
+        `Failed to load reviews (${response.status})`,
+    );
+  }
+
+  return data;
+}
+
+export async function approveProduct(
+  productId: string,
+) {
+  const response = await fetch(
+    `${API_URL}/api/review/${productId}/approve`,
+    {
+      method: "POST",
+    },
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data?.detail ||
+        `Approval failed (${response.status})`,
+    );
+  }
+
+  return data;
+}
+
+export async function rejectProduct(
+  productId: string,
+) {
+  const response = await fetch(
+    `${API_URL}/api/review/${productId}/reject`,
+    {
+      method: "POST",
+    },
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data?.detail ||
+        `Rejection failed (${response.status})`,
+    );
+  }
+
+  return data;
+}
+export interface AnalyticsSummary {
+  total_products: number;
+  ai_enriched: number;
+  needs_review: number;
+  enrichment_coverage: number;
+  average_ai_confidence: number;
+  pipeline: {
+    imported: number;
+    ai_enriched: number;
+    needs_review: number;
+  };
+}
+
+export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
+  const response = await fetch(
+    `${API_URL}/api/analytics/summary`,
+    {
+      cache: "no-store",
+    },
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data?.detail ||
+        `Failed to load analytics (${response.status})`,
+    );
+  }
+
+  return data;
+}
+export async function ingestWebsite(url: string) {
+  const response = await fetch(
+    `${API_URL}/api/ingestion/website`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ url }),
+    },
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data?.detail ||
+        `Website extraction failed (${response.status})`,
+    );
+  }
+
+  return data;
+}

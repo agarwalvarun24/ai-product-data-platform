@@ -1,37 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:8000";
-
-interface AnalyticsData {
-  total_products: number;
-  ai_enriched: number;
-  needs_review: number;
-  enrichment_coverage: number;
-  average_ai_confidence: number;
-  pipeline: {
-    imported: number;
-    ai_enriched: number;
-    needs_review: number;
-  };
-}
+import {
+  getAnalyticsSummary,
+  AnalyticsSummary,
+} from "@/lib/api";
 
 export default function AnalyticsPage() {
-  const [stats, setStats] = useState<AnalyticsData>({
-    total_products: 0,
-    ai_enriched: 0,
-    needs_review: 0,
-    enrichment_coverage: 0,
-    average_ai_confidence: 0,
-    pipeline: {
-      imported: 0,
-      ai_enriched: 0,
-      needs_review: 0,
-    },
-  });
+  const [stats, setStats] =
+    useState<AnalyticsSummary | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -39,36 +16,13 @@ export default function AnalyticsPage() {
   useEffect(() => {
     async function loadAnalytics() {
       try {
-        setLoading(true);
-        setError("");
-
-        const response = await fetch(
-          `${API_URL}/api/analytics/summary`,
-          {
-            cache: "no-store",
-          }
-        );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data?.detail ||
-              `Failed to load analytics (${response.status})`
-          );
-        }
-
+        const data = await getAnalyticsSummary();
         setStats(data);
-      } catch (error) {
-        console.error(
-          "Failed to load analytics:",
-          error
-        );
-
+      } catch (err: unknown) {
         setError(
-          error instanceof Error
-            ? error.message
-            : "Failed to load analytics."
+          err instanceof Error
+            ? err.message
+            : "Failed to load analytics.",
         );
       } finally {
         setLoading(false);
@@ -90,34 +44,28 @@ export default function AnalyticsPage() {
     );
   }
 
-  if (error) {
+  if (error || !stats) {
     return (
       <main className="min-h-screen bg-[#f8f9fc] p-8">
         <div className="mx-auto max-w-6xl">
-          <div className="rounded-xl bg-red-50 p-6 text-red-600">
-            Failed to load analytics: {error}
+          <div className="rounded-xl bg-red-50 p-5 text-red-600">
+            {error || "Analytics unavailable."}
           </div>
         </div>
       </main>
     );
   }
 
-  const enrichedPercentage =
-    stats.total_products > 0
-      ? Math.min(
-          (stats.ai_enriched / stats.total_products) *
-            100,
-          100
-        )
-      : 0;
+  const coverage = Math.round(
+    stats.enrichment_coverage,
+  );
 
   const reviewPercentage =
     stats.total_products > 0
-      ? Math.min(
+      ? Math.round(
           (stats.needs_review /
             stats.total_products) *
             100,
-          100
         )
       : 0;
 
@@ -140,69 +88,40 @@ export default function AnalyticsPage() {
           </p>
         </div>
 
-        {/* MAIN STAT CARDS */}
+        {/* STAT CARDS */}
 
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
 
-          <div className="rounded-xl bg-white p-6 shadow-sm">
-            <p className="text-sm text-slate-500">
-              Total Products
-            </p>
+          <StatCard
+            label="Total Products"
+            value={stats.total_products}
+            description="Imported into workspace"
+          />
 
-            <p className="mt-3 text-4xl font-bold text-slate-900">
-              {stats.total_products}
-            </p>
+          <StatCard
+            label="AI Enriched"
+            value={stats.ai_enriched}
+            description="Products processed by AI"
+            valueClass="text-indigo-600"
+          />
 
-            <p className="mt-2 text-sm text-slate-400">
-              Imported into workspace
-            </p>
-          </div>
+          <StatCard
+            label="Needs Review"
+            value={stats.needs_review}
+            description="Require human verification"
+            valueClass="text-amber-500"
+          />
 
-          <div className="rounded-xl bg-white p-6 shadow-sm">
-            <p className="text-sm text-slate-500">
-              AI Enriched
-            </p>
-
-            <p className="mt-3 text-4xl font-bold text-indigo-600">
-              {stats.ai_enriched}
-            </p>
-
-            <p className="mt-2 text-sm text-slate-400">
-              Products processed by AI
-            </p>
-          </div>
-
-          <div className="rounded-xl bg-white p-6 shadow-sm">
-            <p className="text-sm text-slate-500">
-              Needs Review
-            </p>
-
-            <p className="mt-3 text-4xl font-bold text-amber-500">
-              {stats.needs_review}
-            </p>
-
-            <p className="mt-2 text-sm text-slate-400">
-              Require human verification
-            </p>
-          </div>
-
-          <div className="rounded-xl bg-white p-6 shadow-sm">
-            <p className="text-sm text-slate-500">
-              Enrichment Coverage
-            </p>
-
-            <p className="mt-3 text-4xl font-bold text-emerald-600">
-              {stats.enrichment_coverage}%
-            </p>
-
-            <p className="mt-2 text-sm text-slate-400">
-              Products enriched
-            </p>
-          </div>
+          <StatCard
+            label="Enrichment Coverage"
+            value={`${coverage}%`}
+            description="Products enriched"
+            valueClass="text-emerald-600"
+          />
 
         </div>
 
-        {/* QUALITY SECTION */}
+        {/* QUALITY */}
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
 
@@ -219,21 +138,28 @@ export default function AnalyticsPage() {
             <div className="mt-8 flex items-center gap-6">
 
               <div className="flex h-32 w-32 items-center justify-center rounded-full bg-indigo-50">
+
                 <span className="text-3xl font-bold text-indigo-600">
-                  {stats.average_ai_confidence}%
+                  {Math.round(
+                    stats.average_ai_confidence,
+                  )}
+                  %
                 </span>
+
               </div>
 
               <div>
+
                 <p className="text-lg font-semibold text-slate-900">
                   Average AI Confidence
                 </p>
 
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Higher confidence means the generated
-                  product information is more likely to
-                  require no manual correction.
+                  Higher confidence means generated
+                  product information is more likely
+                  to require no manual correction.
                 </p>
+
               </div>
 
             </div>
@@ -251,81 +177,28 @@ export default function AnalyticsPage() {
               Current product processing status
             </p>
 
-            <div className="mt-8 space-y-6">
+            <PipelineRow
+              label="Imported"
+              value={stats.pipeline.imported}
+              percentage={
+                stats.total_products > 0
+                  ? 100
+                  : 0
+              }
+            />
 
-              {/* IMPORTED */}
+            <PipelineRow
+              label="AI Enriched"
+              value={stats.pipeline.ai_enriched}
+              percentage={coverage}
+            />
 
-              <div>
-                <div className="mb-2 flex justify-between text-sm">
-                  <span className="text-slate-600">
-                    Imported
-                  </span>
+            <PipelineRow
+              label="Needs Review"
+              value={stats.pipeline.needs_review}
+              percentage={reviewPercentage}
+            />
 
-                  <span className="font-semibold">
-                    {stats.pipeline.imported}
-                  </span>
-                </div>
-
-                <div className="h-3 rounded-full bg-slate-100">
-                  <div
-                    className="h-3 rounded-full bg-slate-400"
-                    style={{
-                      width:
-                        stats.total_products > 0
-                          ? "100%"
-                          : "0%",
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* AI ENRICHED */}
-
-              <div>
-                <div className="mb-2 flex justify-between text-sm">
-                  <span className="text-slate-600">
-                    AI Enriched
-                  </span>
-
-                  <span className="font-semibold">
-                    {stats.pipeline.ai_enriched}
-                  </span>
-                </div>
-
-                <div className="h-3 rounded-full bg-slate-100">
-                  <div
-                    className="h-3 rounded-full bg-indigo-500"
-                    style={{
-                      width: `${enrichedPercentage}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* NEEDS REVIEW */}
-
-              <div>
-                <div className="mb-2 flex justify-between text-sm">
-                  <span className="text-slate-600">
-                    Needs Review
-                  </span>
-
-                  <span className="font-semibold">
-                    {stats.pipeline.needs_review}
-                  </span>
-                </div>
-
-                <div className="h-3 rounded-full bg-slate-100">
-                  <div
-                    className="h-3 rounded-full bg-amber-400"
-                    style={{
-                      width: `${reviewPercentage}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-            </div>
           </div>
 
         </div>
@@ -343,16 +216,91 @@ export default function AnalyticsPage() {
           </h2>
 
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
-            Product data is automatically enriched by AI,
-            scored for confidence, and routed to human
-            review when confidence is low. This creates a
-            continuous quality-control workflow instead of
-            simply generating product descriptions.
+            Product data is automatically enriched by
+            AI, scored for confidence, and routed to
+            human review when confidence is low.
+            This combines automation with human
+            quality control instead of simply
+            generating product descriptions.
           </p>
 
         </div>
 
       </div>
     </main>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  description,
+  valueClass = "text-slate-900",
+}: {
+  label: string;
+  value: string | number;
+  description: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="rounded-xl bg-white p-6 shadow-sm">
+
+      <p className="text-sm text-slate-500">
+        {label}
+      </p>
+
+      <p
+        className={`mt-3 text-4xl font-bold ${valueClass}`}
+      >
+        {value}
+      </p>
+
+      <p className="mt-2 text-sm text-slate-400">
+        {description}
+      </p>
+
+    </div>
+  );
+}
+
+function PipelineRow({
+  label,
+  value,
+  percentage,
+}: {
+  label: string;
+  value: number;
+  percentage: number;
+}) {
+  return (
+    <div className="mt-7">
+
+      <div className="mb-2 flex justify-between text-sm">
+
+        <span className="text-slate-600">
+          {label}
+        </span>
+
+        <span className="font-semibold">
+          {value}
+        </span>
+
+      </div>
+
+      <div className="h-3 rounded-full bg-slate-100">
+
+        <div
+          className="h-3 rounded-full bg-indigo-500"
+          style={{
+            width: `${Math.min(
+              percentage,
+              100,
+            )}%`,
+          }}
+        />
+
+      </div>
+
+    </div>
   );
 }

@@ -8,6 +8,7 @@ import {
 
 import {
   getProducts,
+  enrichProductsBulk,
   Product,
 } from "@/lib/api";
 
@@ -50,6 +51,10 @@ function getStatus(product: Product) {
     return product.status;
   }
 
+  if (product.enrichment_status) {
+    return product.enrichment_status;
+  }
+
   if (product.valid === true) {
     return "validated";
   }
@@ -84,6 +89,34 @@ export default function ProductsPage() {
   const [error, setError] =
     useState("");
 
+  const [selectedIds, setSelectedIds] =
+    useState<string[]>([]);
+
+  const [enriching, setEnriching] =
+    useState(false);
+
+  const [bulkMessage, setBulkMessage] =
+    useState("");
+
+  const [bulkError, setBulkError] =
+    useState("");
+
+  // Read search value from the global TopBar.
+  useEffect(() => {
+    const params = new URLSearchParams(
+      window.location.search,
+    );
+
+    const urlSearch =
+      params.get("search") || "";
+
+    if (urlSearch) {
+      setSearchInput(urlSearch);
+      setSearch(urlSearch);
+      setPage(1);
+    }
+  }, []);
+
   async function loadProducts() {
     try {
       setLoading(true);
@@ -97,6 +130,8 @@ export default function ProductsPage() {
 
       setProducts(result.products);
       setTotal(result.total);
+
+      setSelectedIds([]);
     } catch (error) {
       console.error(error);
 
@@ -143,20 +178,111 @@ export default function ProductsPage() {
     [products],
   );
 
+  const allSelected =
+    products.length > 0 &&
+    products.every((product) =>
+      selectedIds.includes(String(product.id)),
+    );
+
   function searchProducts() {
+    const value = searchInput.trim();
+
     setPage(1);
-    setSearch(searchInput);
+    setSearch(value);
+
+    const url = value
+      ? `/products?search=${encodeURIComponent(value)}`
+      : "/products";
+
+    window.history.replaceState(
+      {},
+      "",
+      url,
+    );
   }
 
   function clearSearch() {
     setSearchInput("");
     setSearch("");
     setPage(1);
+
+    window.history.replaceState(
+      {},
+      "",
+      "/products",
+    );
+  }
+
+  function toggleProduct(productId: string) {
+    setSelectedIds((current) => {
+      if (current.includes(productId)) {
+        return current.filter(
+          (id) => id !== productId,
+        );
+      }
+
+      return [...current, productId];
+    });
+
+    setBulkMessage("");
+    setBulkError("");
+  }
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(
+        products.map((product) =>
+          String(product.id),
+        ),
+      );
+    }
+
+    setBulkMessage("");
+    setBulkError("");
+  }
+
+  async function handleBulkEnrichment() {
+    if (selectedIds.length === 0) {
+      return;
+    }
+
+    try {
+      setEnriching(true);
+      setBulkMessage("");
+      setBulkError("");
+
+      const result =
+        await enrichProductsBulk(
+          selectedIds,
+        );
+
+      setBulkMessage(
+        `AI enrichment completed: ${result.successful} successful, ${result.failed} failed.`,
+      );
+
+      setSelectedIds([]);
+
+      await loadProducts();
+    } catch (error) {
+      console.error(error);
+
+      setBulkError(
+        error instanceof Error
+          ? error.message
+          : "Bulk enrichment failed.",
+      );
+    } finally {
+      setEnriching(false);
+    }
   }
 
   return (
     <main className="min-h-screen bg-[#f8f9fc] px-8 py-10">
       <div className="mx-auto max-w-[1400px]">
+
+        {/* HEADER */}
 
         <div className="mb-8">
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
@@ -172,6 +298,8 @@ export default function ProductsPage() {
             AI enrichment results, and data quality.
           </p>
         </div>
+
+        {/* METRICS */}
 
         <div className="mb-6 grid gap-4 md:grid-cols-4">
 
@@ -205,7 +333,11 @@ export default function ProductsPage() {
 
         </div>
 
+        {/* PRODUCT TABLE */}
+
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+          {/* SEARCH BAR */}
 
           <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
 
@@ -245,11 +377,58 @@ export default function ProductsPage() {
 
             </div>
 
-            <button className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-medium text-slate-700 hover:bg-slate-50">
-              Filters
-            </button>
+            {/* BULK ENRICHMENT BUTTON */}
+
+            <div className="flex items-center gap-3">
+
+              {selectedIds.length > 0 && (
+                <button
+                  onClick={handleBulkEnrichment}
+                  disabled={enriching}
+                  className="h-11 rounded-xl bg-indigo-600 px-5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {enriching
+                    ? "Enriching..."
+                    : `Enrich Selected (${selectedIds.length})`}
+                </button>
+              )}
+
+              <button className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                Filters
+              </button>
+
+            </div>
 
           </div>
+
+          {/* ACTIVE SEARCH */}
+
+          {search && (
+            <div className="border-b border-slate-200 bg-indigo-50 px-5 py-3 text-xs text-indigo-700">
+              Showing results for:
+              <span className="ml-1 font-semibold">
+                "{search}"
+              </span>
+            </div>
+          )}
+
+          {/* BULK SUCCESS MESSAGE */}
+
+          {bulkMessage && (
+            <div className="mx-5 mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              {bulkMessage}
+            </div>
+          )}
+
+          {/* BULK ERROR MESSAGE */}
+
+          {bulkError && (
+            <div className="mx-5 mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {bulkError}
+            </div>
+          )}
+
+          {/* NORMAL ERROR */}
 
           {error && (
             <div className="m-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -257,11 +436,15 @@ export default function ProductsPage() {
             </div>
           )}
 
+          {/* LOADING */}
+
           {loading && (
             <div className="p-12 text-center text-sm text-slate-500">
               Loading products...
             </div>
           )}
+
+          {/* EMPTY */}
 
           {!loading &&
             !error &&
@@ -272,20 +455,32 @@ export default function ProductsPage() {
                 </p>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Import a dataset or change your
-                  search.
+                  {search
+                    ? `No products match "${search}".`
+                    : "Import a dataset or change your search."}
                 </p>
               </div>
             )}
+
+          {/* TABLE */}
 
           {!loading &&
             products.length > 0 && (
               <div className="overflow-x-auto">
 
-                <table className="w-full min-w-[950px]">
+                <table className="w-full min-w-[1050px]">
 
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50">
+
+                      <th className="w-14 px-5 py-4 text-left">
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          onChange={toggleSelectAll}
+                          className="h-4 w-4 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                      </th>
 
                       <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                         Product
@@ -323,16 +518,38 @@ export default function ProductsPage() {
                       const status =
                         getStatus(product);
 
+                      const productId =
+                        String(product.id);
+
+                      const selected =
+                        selectedIds.includes(
+                          productId,
+                        );
+
                       return (
                         <tr
-                          key={String(
-                            product.id,
-                          )}
-                          className="border-b border-slate-100 hover:bg-slate-50"
+                          key={productId}
+                          className={`border-b border-slate-100 hover:bg-slate-50 ${
+                            selected
+                              ? "bg-indigo-50"
+                              : ""
+                          }`}
                         >
 
                           <td className="px-5 py-5">
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() =>
+                                toggleProduct(
+                                  productId,
+                                )
+                              }
+                              className="h-4 w-4 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                            />
+                          </td>
 
+                          <td className="px-5 py-5">
                             <p className="max-w-[320px] truncate text-sm font-semibold text-slate-900">
                               {getTitle(product)}
                             </p>
@@ -340,7 +557,6 @@ export default function ProductsPage() {
                             <p className="mt-1 text-xs text-slate-400">
                               {getSku(product)}
                             </p>
-
                           </td>
 
                           <td className="px-5 py-5 text-sm text-slate-600">
@@ -422,6 +638,8 @@ export default function ProductsPage() {
 
               </div>
             )}
+
+          {/* PAGINATION */}
 
           {!loading &&
             products.length > 0 && (

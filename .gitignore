@@ -18,3 +18,4 @@ out/
 # Local environment files
 backend/.env
 frontend/.env.local
+productiq.db
